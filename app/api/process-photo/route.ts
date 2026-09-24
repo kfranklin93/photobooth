@@ -19,7 +19,12 @@ import {
 } from "@/lib/canva/errors";
 import { EmailDeliveryError, sendPhotoEmail } from "@/lib/email";
 import { MissingEnvError, findMissingRuntimeEnv } from "@/lib/env";
-import { findFrame, getFrames } from "@/config/frames";
+import {
+  eventFrames,
+  findEvent,
+  findEventFrame,
+  getLiveEvents,
+} from "@/config/events";
 import { MAX_PHOTOS } from "@/config/booth";
 
 // Buffer, node:fs and the Canva SDK calls all need the Node.js runtime.
@@ -41,6 +46,7 @@ interface SuccessBody {
   designIds: string[];
   downloadUrls: string[];
   frameId: string;
+  eventSlug: string;
 }
 
 interface ErrorBody {
@@ -86,26 +92,45 @@ export async function POST(request: Request) {
   // A guest may take up to MAX_PHOTOS, posted as repeated `photo` fields.
   const photos = form.getAll("photo").filter((v): v is File => v instanceof File);
   const requestedFrameId = String(form.get("frameId") ?? "").trim();
+  const requestedEventSlug = String(form.get("eventSlug") ?? "").trim();
 
-  // Resolve the frame first: without a valid one there's nothing to fill.
-  const frames = getFrames();
-  if (frames.length === 0) {
-    console.error("[process-photo] No frames configured.");
+  // Resolve the event first, then the frame within it. Scoping the lookup this
+  // way means a frame id from one party can never autofill another party's
+  // design, even if the ids happen to collide.
+  const liveEvents = getLiveEvents();
+  if (liveEvents.length === 0) {
+    console.error("[process-photo] No events with usable frames configured.");
     return fail(
       "The photo booth is not finished setting up. Please find the host.",
       503,
-      "No frames configured. Add entries to config/frames.ts, or set " +
-        "CANVA_TEMPLATE_ID / CANVA_SOURCE_DESIGN_ID for a single-frame setup.",
+      "No event has a frame with a designId or brandTemplateId. " +
+        "See config/events.ts.",
     );
   }
 
-  // One configured frame means the kiosk skips the picker, so fall back to it.
-  const frame =
-    findFrame(requestedFrameId) ?? (frames.length === 1 ? frames[0] : undefined);
+  // A single-event deployment needn't send the slug, but a slug that *is* sent
+  // must resolve. Falling back on an unrecognised slug would silently render a
+  // guest's photo into the wrong party's frame.
+  const event = requestedEventSlug
+    ? findEvent(requestedEventSlug)
+    : liveEvents.length === 1
+      ? liveEvents[0]
+      : undefined;
+
+  if (!event) {
+    return fail("Please start again from the beginning.", 400,
+      requestedEventSlug
+        ? `Unknown or unfinished eventSlug ${JSON.stringify(requestedEventSlug)}. ` +
+            `Live events: ${liveEvents.map((e) => e.slug).join(", ")}`
+        : `No eventSlug supplied and ${liveEvents.length} events are live, ` +
+            `so the event is ambiguous.`);
+  }
+
+  const frame = findEventFrame(event, requestedFrameId);
   if (!frame) {
     return fail("Please choose a frame and try again.", 400,
-      `Unknown frameId ${JSON.stringify(requestedFrameId)}. ` +
-        `Configured: ${frames.map((f) => f.id).join(", ")}`);
+      `Unknown frameId ${JSON.stringify(requestedFrameId)} for event ` +
+        `"${event.slug}". Frames: ${eventFrames(event).map((f) => f.id).join(", ")}`);
   }
 
   if (!EMAIL_PATTERN.test(email) || email.length > 254) {
@@ -152,7 +177,7 @@ export async function POST(request: Request) {
           frame,
           photo: await photo.arrayBuffer(),
           fileName: `booth-${stamp}-${index + 1}.${extensionFor(mimeType)}`,
-          designTitle: `Photo Booth ${frame.label} ${stamp} (${index + 1})`,
+          designTitle: `${event.shortName} ${frame.label} ${stamp} (${index + 1})`,
           signal: request.signal,
         });
       }),
@@ -160,6 +185,8 @@ export async function POST(request: Request) {
 
     const messageId = await sendPhotoEmail({
       to: email,
+      eventName: event.name,
+      emoji: event.emailEmoji,
       photos: rendered.map((result, index) => ({
         bytes: result.imageBytes,
         fileName:
@@ -172,9 +199,9 @@ export async function POST(request: Request) {
     });
 
     console.log(
-      `[process-photo] Delivered ${rendered.length} photo(s) using frame ` +
-        `"${frame.id}" in ${Date.now() - startedAt}ms (message ${messageId}): ` +
-        rendered.map((r) => r.designId).join(", "),
+      `[process-photo] Delivered ${rendered.length} photo(s) for event ` +
+        `"${event.slug}" using frame "${frame.id}" in ${Date.now() - startedAt}ms ` +
+        `(message ${messageId}): ${rendered.map((r) => r.designId).join(", ")}`,
     );
 
     return NextResponse.json<SuccessBody>({
@@ -184,6 +211,7 @@ export async function POST(request: Request) {
       designIds: rendered.map((r) => r.designId),
       downloadUrls: rendered.map((r) => r.downloadUrls[0]),
       frameId: frame.id,
+      eventSlug: event.slug,
     });
   } catch (error) {
     console.error("[process-photo] Failed:", error);

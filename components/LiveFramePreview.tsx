@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, type RefObject } from "react";
 
 import { ButterflyIcon } from "@/components/ButterflyIcon";
-import { CAPTURE_ASPECT, MIRROR } from "@/lib/camera";
+import { DEFAULT_CAPTURE_ASPECT, MIRROR } from "@/lib/camera";
 import type { CameraState } from "@/lib/use-camera";
 
 interface LiveFramePreviewProps {
@@ -23,6 +23,11 @@ interface LiveFramePreviewProps {
   className?: string;
   /** Smaller variant used inside the frame picker's option tiles. */
   compact?: boolean;
+  /**
+   * Shape of this preview, as width / height — the chosen frame's opening.
+   * Frames differ, so the viewfinder follows whichever one is selected.
+   */
+  aspect?: number;
 }
 
 /**
@@ -45,6 +50,7 @@ export function LiveFramePreview({
   children,
   className = "",
   compact = false,
+  aspect = DEFAULT_CAPTURE_ASPECT,
 }: LiveFramePreviewProps) {
   const internalRef = useRef<HTMLVideoElement>(null);
   const ref = videoRef ?? internalRef;
@@ -62,7 +68,7 @@ export function LiveFramePreview({
 
   return (
     <div
-      style={{ aspectRatio: CAPTURE_ASPECT }}
+      style={{ aspectRatio: aspect }}
       className={
         "relative w-full overflow-hidden bg-plum-950 " +
         (compact ? "rounded-2xl " : "rounded-3xl ") +

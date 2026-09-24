@@ -6,7 +6,7 @@ import { useState } from "react";
 import { BoothCard } from "@/components/BoothCard";
 import { LiveFramePreview } from "@/components/LiveFramePreview";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { CAPTURE_ASPECT } from "@/lib/camera";
+
 import { useCamera } from "@/lib/use-camera";
 import type { PublicFrameOption } from "@/config/frames";
 
@@ -75,6 +75,7 @@ export function FrameChoiceScreen({
               stream={stream}
               state={state}
               overlaySrc={selectedFrame?.thumbnail}
+              aspect={selectedFrame?.aspect}
               className="mx-auto max-h-[34vh] max-w-[13rem] border border-gold-200/40 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] xs:max-w-[15rem] sm:max-h-[38vh] sm:max-w-xs lg:max-h-none lg:max-w-sm"
             />
           </div>
@@ -112,11 +113,12 @@ export function FrameChoiceScreen({
                         stream={stream}
                         state={state}
                         overlaySrc={frame.thumbnail}
+                        aspect={frame.aspect}
                         compact
                       />
                     ) : (
                       <div
-                        style={{ aspectRatio: CAPTURE_ASPECT }}
+                        style={{ aspectRatio: frame.aspect }}
                         className="relative w-full overflow-hidden rounded-lg bg-gradient-to-br from-violet-700 via-plum-800 to-plum-950 sm:rounded-2xl"
                       >
                         <Image

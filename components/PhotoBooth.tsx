@@ -27,12 +27,27 @@ interface ProcessPhotoResponse {
   detail?: string;
 }
 
-interface PhotoBoothProps {
-  eventName: string;
-  frames: PublicFrameOption[];
+/** The event's presentation details. No Canva IDs reach the browser. */
+export interface BoothEventInfo {
+  slug: string;
+  name: string;
+  tagline: string;
+  headline: string;
+  palette: string;
 }
 
-export function PhotoBooth({ eventName, frames }: PhotoBoothProps) {
+interface PhotoBoothProps {
+  event: BoothEventInfo;
+  frames: PublicFrameOption[];
+  /** Offer a way back to the chooser, when there's more than one event. */
+  showBackToEvents?: boolean;
+}
+
+export function PhotoBooth({
+  event,
+  frames,
+  showBackToEvents = false,
+}: PhotoBoothProps) {
   const [step, setStep] = useState<Step>("idle");
   const [frameId, setFrameId] = useState<string>("");
   /** Up to MAX_PHOTOS, all sent in a single email. */
@@ -113,6 +128,9 @@ export function PhotoBooth({ eventName, frames }: PhotoBoothProps) {
         });
         body.append("email", guestEmail);
         body.append("frameId", frameId);
+        // Scopes the frame lookup to this event, so a frame id can't resolve
+        // against another party's designs.
+        body.append("eventSlug", event.slug);
 
         const response = await fetch("/api/process-photo", {
           method: "POST",
@@ -151,18 +169,25 @@ export function PhotoBooth({ eventName, frames }: PhotoBoothProps) {
         abortRef.current = null;
       }
     },
-    [photos, frameId],
+    [photos, frameId, event.slug],
   );
 
   return (
     <main
-      className="relative flex min-h-dvh flex-col items-center justify-center
-                 px-3 py-6 xs:px-4 sm:px-6 sm:py-10 lg:px-8"
+      data-palette={event.palette}
+      className="booth-surface relative flex min-h-dvh flex-col items-center
+                 justify-center px-3 py-6 xs:px-4 sm:px-6 sm:py-10 lg:px-8"
     >
       <ButterflyBackdrop />
 
       {step === "idle" ? (
-        <StartScreen eventName={eventName} onStart={handleStart} />
+        <StartScreen
+          eventName={event.name}
+          tagline={event.tagline}
+          headline={event.headline}
+          onStart={handleStart}
+          backToEventsHref={showBackToEvents ? "/" : undefined}
+        />
       ) : null}
 
       {step === "frame" ? (
@@ -180,6 +205,7 @@ export function PhotoBooth({ eventName, frames }: PhotoBoothProps) {
           onChangeFrame={handleChangeFrame}
           overlaySrc={selectedFrame?.thumbnail}
           frameLabel={frames.length > 1 ? selectedFrame?.label : undefined}
+          aspect={selectedFrame?.aspect}
           initialError={error}
         />
       ) : null}

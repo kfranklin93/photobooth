@@ -158,6 +158,10 @@ export interface SendPhotoEmailOptions {
   to: string;
   /** One or more finished photos. All are attached to a single email. */
   photos: PhotoAttachment[];
+  /** Event name for the copy. Falls back to EVENT_NAME when omitted. */
+  eventName?: string;
+  /** Emoji for the subject line. Defaults to a butterfly. */
+  emoji?: string;
 }
 
 /**
@@ -171,11 +175,14 @@ export async function sendPhotoEmail(
     throw new EmailDeliveryError("No photos to send.");
   }
 
-  const eventName = env.eventName;
+  // Per-event name where given, so a sleepover guest isn't told their photo is
+  // from the baby shower.
+  const eventName = options.eventName?.trim() || env.eventName;
+  const emoji = options.emoji ?? "\u{1F98B}";
   const many = photos.length > 1;
   const subject = many
-    ? `Your ${eventName} photos are here \u{1F98B}`
-    : `Your ${eventName} photo is here \u{1F98B}`;
+    ? `Your ${eventName} photos are here ${emoji}`
+    : `Your ${eventName} photo is here ${emoji}`;
 
   // Retried: the attachments are a multi-hundred-KB upload, and a dropped
   // connection mid-send is the one failure that would silently cost a guest

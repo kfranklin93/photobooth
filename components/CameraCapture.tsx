@@ -18,6 +18,8 @@ import { useCamera } from "@/lib/use-camera";
 
 interface CameraCaptureProps {
   onCapture: (photo: File) => void;
+  /** Shape to capture, from the chosen frame's photo opening. */
+  aspect: number;
   /** Rendered when the camera can't be used, so the guest still has a path. */
   fallback: React.ReactNode;
   /**
@@ -34,6 +36,7 @@ export function CameraCapture({
   onCapture,
   fallback,
   overlaySrc,
+  aspect,
 }: CameraCaptureProps) {
   const { state, reason, stream } = useCamera();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,7 +49,7 @@ export function CameraCapture({
     if (countdown === 0) {
       void (async () => {
         const video = videoRef.current;
-        const photo = video ? await grabFrameFromVideo(video) : null;
+        const photo = video ? await grabFrameFromVideo(video, aspect) : null;
         setCountdown(null);
         if (photo) onCapture(photo);
       })();
@@ -55,7 +58,7 @@ export function CameraCapture({
 
     const timer = setTimeout(() => setCountdown(countdown - 1), 1_000);
     return () => clearTimeout(timer);
-  }, [countdown, onCapture, videoRef]);
+  }, [countdown, onCapture, videoRef, aspect]);
 
   if (state === "unavailable") {
     return (
@@ -77,6 +80,7 @@ export function CameraCapture({
         state={state}
         videoRef={videoRef}
         overlaySrc={overlaySrc}
+        aspect={aspect}
         className="mx-auto max-h-[40vh] max-w-[13rem] border border-gold-200/40 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] xs:max-w-[15rem] sm:max-h-[46vh] sm:max-w-sm lg:max-w-md"
       >
         {countdown !== null && countdown > 0 ? (

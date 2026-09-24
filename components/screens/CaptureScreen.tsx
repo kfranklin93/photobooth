@@ -7,7 +7,7 @@ import { BoothCard } from "@/components/BoothCard";
 import { ButterflyIcon } from "@/components/ButterflyIcon";
 import { CameraCapture } from "@/components/CameraCapture";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { CAPTURE_ASPECT } from "@/lib/camera";
+import { DEFAULT_CAPTURE_ASPECT } from "@/lib/camera";
 import { MAX_PHOTOS } from "@/config/booth";
 
 const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
@@ -20,6 +20,8 @@ interface CaptureScreenProps {
   /** Frame artwork shown over the viewfinder and every review shot. */
   overlaySrc?: string;
   frameLabel?: string;
+  /** Shape of the chosen frame's photo opening, as width / height. */
+  aspect?: number;
   /** Error carried over from a failed send. */
   initialError?: string;
 }
@@ -46,6 +48,7 @@ export function CaptureScreen({
   onChangeFrame,
   overlaySrc,
   frameLabel,
+  aspect = DEFAULT_CAPTURE_ASPECT,
   initialError,
 }: CaptureScreenProps) {
   const [kept, setKept] = useState<Shot[]>([]);
@@ -162,7 +165,7 @@ export function CaptureScreen({
         {review ? (
           <div className="space-y-5">
             <div
-              style={{ aspectRatio: CAPTURE_ASPECT }}
+              style={{ aspectRatio: aspect }}
               className="relative mx-auto max-h-[40vh] w-full max-w-[13rem] overflow-hidden rounded-2xl border border-gold-200/40 bg-plum-950 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] xs:max-w-[15rem] sm:max-h-[46vh] sm:max-w-sm sm:rounded-3xl"
             >
               <Image
@@ -208,6 +211,7 @@ export function CaptureScreen({
           <CameraCapture
             onCapture={acceptFile}
             overlaySrc={overlaySrc}
+            aspect={aspect}
             fallback={
               <label
                 htmlFor="booth-photo"
@@ -236,7 +240,7 @@ export function CaptureScreen({
             {kept.map((shot, index) => (
               <li key={shot.url} className="relative">
                 <div
-                  style={{ aspectRatio: CAPTURE_ASPECT }}
+                  style={{ aspectRatio: aspect }}
                   className="relative w-16 overflow-hidden rounded-lg border border-gold-200/40 xs:w-20 sm:w-24 sm:rounded-xl"
                 >
                   <Image

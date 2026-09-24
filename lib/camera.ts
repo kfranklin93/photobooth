@@ -15,53 +15,58 @@ export const FACING_MODE: "user" | "environment" = "user";
 export const MIRROR = true;
 
 /**
- * Shape of the captured photo, as width / height. This must match the shape of
- * the photo opening in the Canva template: Canva frames crop to fill, so a
- * mismatch silently throws away part of every photo and can clip faces.
+ * Fallback photo shape, as width / height, when no frame has been chosen.
  *
- *   3 / 4  portrait  (current — matches a portrait template opening)
- *   2 / 3  portrait, taller (exact match for a 4x6 print)
- *   4 / 3  landscape
- *   1      square
- *
- * Every viewfinder and preview uses this value, so what the guest sees is what
- * gets sent.
+ * The real value comes from the chosen frame: each one declares the shape of its
+ * photo opening, because Canva crops to fill and a mismatch silently throws away
+ * part of every photo. Frame choice happens before capture precisely so the
+ * viewfinder can adopt the right shape.
  */
-export const CAPTURE_ASPECT = 3 / 4;
+export const DEFAULT_CAPTURE_ASPECT = 3 / 4;
 
-/** Constraints for a stream already close to the target shape. */
+/**
+ * Constraints for a stream close to the target shape.
+ *
+ * One stream serves every frame in the picker, and those can have different
+ * aspects, so this asks for a generous frame and lets the capture crop. Cameras
+ * commonly ignore `aspectRatio` anyway, which is why cropping is what actually
+ * guarantees the output shape.
+ */
 export function videoConstraints(): MediaTrackConstraints {
   return {
     facingMode: FACING_MODE,
-    width: { ideal: Math.round(1920 * CAPTURE_ASPECT) },
+    width: { ideal: 1920 },
     height: { ideal: 1920 },
-    aspectRatio: { ideal: CAPTURE_ASPECT },
   };
 }
 
 /**
- * Grabs the current video frame as a JPEG File, centre-cropped to
- * CAPTURE_ASPECT.
+ * Grabs the current video frame as a JPEG File, centre-cropped to `aspect`.
  *
  * The crop is what keeps the output honest. Previews use CSS `object-cover`,
  * which centre-crops the stream to the viewfinder's shape; writing the full
  * frame instead would hand the guest a wider photo than the one they posed for.
+ *
+ * @param aspect Target width / height, from the chosen frame.
  */
 export async function grabFrameFromVideo(
   video: HTMLVideoElement,
+  aspect: number = DEFAULT_CAPTURE_ASPECT,
 ): Promise<File | null> {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   if (!sourceWidth || !sourceHeight) return null;
 
-  // Largest rectangle of CAPTURE_ASPECT that fits inside the source frame.
+  const target = aspect > 0 ? aspect : DEFAULT_CAPTURE_ASPECT;
+
+  // Largest rectangle of `target` that fits inside the source frame.
   const sourceAspect = sourceWidth / sourceHeight;
   let cropWidth = sourceWidth;
   let cropHeight = sourceHeight;
-  if (sourceAspect > CAPTURE_ASPECT) {
-    cropWidth = sourceHeight * CAPTURE_ASPECT; // trim the sides
+  if (sourceAspect > target) {
+    cropWidth = sourceHeight * target; // trim the sides
   } else {
-    cropHeight = sourceWidth / CAPTURE_ASPECT; // trim top and bottom
+    cropHeight = sourceWidth / target; // trim top and bottom
   }
   const offsetX = (sourceWidth - cropWidth) / 2;
   const offsetY = (sourceHeight - cropHeight) / 2;

@@ -1,13 +1,12 @@
 /**
- * The frames guests can choose between.
+ * Frame types shared by every event.
  *
- * Each entry points at one Canva source — either a published brand template or
- * a plain design carrying a named image data field. Add an entry per frame
- * design you build in Canva.
+ * The frames themselves live on their event in `config/events.ts` — a frame only
+ * means something in the context of the party it belongs to. This module holds
+ * the type and the helpers that don't care which event a frame came from.
  *
- * Canva IDs are not secrets (they appear in design URLs), so they live here in
- * version control rather than in `.env.local`. Only the client ID, secret, and
- * refresh token are secret.
+ * Canva IDs are not secrets (they appear in design URLs), so they live in
+ * version control. Only the client ID, secret, and refresh token are secret.
  */
 
 export interface FrameOption {
@@ -35,58 +34,23 @@ export interface FrameOption {
    * leave it unset.
    */
   imageFieldName?: string;
+  /**
+   * Shape of this frame's photo opening, as width / height.
+   *
+   * Canva crops the photo to fill the frame, so the viewfinder has to match or
+   * the guest is framed differently from the result. Because the frame is chosen
+   * before the photo is taken, the camera can adopt whichever ratio the chosen
+   * frame needs.
+   *
+   *   0.75  3:4 portrait      1.0   square
+   *   1.2   6:5 landscape     1.333 4:3 landscape
+   *
+   * Falls back to the event's `captureAspect` when omitted. Measure it from the
+   * artwork's transparent window rather than the canvas size — a square canvas
+   * often holds a landscape opening.
+   */
+  aspect?: number;
 }
-
-/**
- * Edit this list to match the designs you built in Canva.
- *
- * All frames should share the same photo-opening shape, because the camera
- * viewfinder uses a single aspect ratio (CAPTURE_ASPECT in
- * components/CameraCapture.tsx). Mixing portrait and landscape openings means
- * Canva crops some photos more than the guest saw in the preview.
- */
-export const FRAMES: FrameOption[] = [
-  {
-    id: "frame-one",
-    // `label` and `description` are placeholder names — rename them freely,
-    // they're what guests see. Leave `id` alone: the kiosk posts it to the API.
-    label: "Lavender Wings",
-    description: "Soft violet butterflies",
-    thumbnail: "/frames/frame-1.png",
-    designId: "DAHWFL8hvaw", // Canva title: frame2trnsparnt
-  },
-  {
-    id: "frame-two",
-    label: "Golden Flutter",
-    description: "Gold foil and shimmer",
-    thumbnail: "/frames/frame-2.png",
-    designId: "DAHWFJWEFAo", // Canva title: frame3trnsprt
-  },
-  {
-    id: "frame-three",
-    label: "Royal Bloom",
-    description: "Deep violet and blossoms",
-    // Canva flattened this export, so the photo area came out solid white. The
-    // window was punched back out locally — see public/frames/README.md.
-    thumbnail: "/frames/frame-3.png",
-    designId: "DAHWFKgV9i8", // Canva title: frame4trnsprt
-  },
-  {
-    id: "frame-four",
-    label: "Midnight Garden",
-    description: "Dusk violet with gold",
-    thumbnail: "/frames/frame-4.png",
-    designId: "DAHWFJHy8Y0", // Canva title: frame5trnsprt
-  },
-  {
-    id: "frame-five",
-    label: "Butterfly Crown",
-    description: "Regal wings and gold",
-    // Source artwork was 2:3 (900x1350), stretched to 3:4 to match the others.
-    thumbnail: "/frames/frame-5.png",
-    designId: "DAHWFMm3erI", // Canva title: frame1-1
-  },
-];
 
 /** Shape the kiosk needs. Excludes anything Canva-specific. */
 export interface PublicFrameOption {
@@ -94,44 +58,28 @@ export interface PublicFrameOption {
   label: string;
   description: string;
   thumbnail: string;
+  /** Resolved capture aspect for this frame (frame's own, else the event's). */
+  aspect: number;
 }
 
-function legacyFallback(): FrameOption[] {
-  // Keeps a single-frame setup working straight from .env.local, which is how
-  // the booth was configured before frame choice existed.
-  const brandTemplateId = process.env.CANVA_TEMPLATE_ID?.trim();
-  const designId = process.env.CANVA_SOURCE_DESIGN_ID?.trim();
-  if (!brandTemplateId && !designId) return [];
-
-  return [
-    {
-      id: "default",
-      label: "Butterfly Frame",
-      description: "Our signature design",
-      thumbnail: "/frames/placeholder.svg",
-      ...(designId ? { designId } : { brandTemplateId }),
-    },
-  ];
+/** A frame is only usable once it points at something in Canva. */
+export function isFrameReady(frame: FrameOption): boolean {
+  return Boolean(frame.brandTemplateId || frame.designId);
 }
 
-/** Every configured frame, falling back to the single env-configured source. */
-export function getFrames(): FrameOption[] {
-  const configured = FRAMES.filter((frame) => frame.brandTemplateId || frame.designId);
-  return configured.length > 0 ? configured : legacyFallback();
-}
-
-/** Looks up a frame by the id the kiosk sent. */
-export function findFrame(id: string | null | undefined): FrameOption | undefined {
-  if (!id) return undefined;
-  return getFrames().find((frame) => frame.id === id);
-}
-
-/** Strips Canva IDs before handing the list to the browser. */
-export function toPublicFrames(frames: FrameOption[]): PublicFrameOption[] {
-  return frames.map(({ id, label, description, thumbnail }) => ({
+/**
+ * Strips Canva IDs before handing the list to the browser, resolving each
+ * frame's capture aspect against the event default.
+ */
+export function toPublicFrames(
+  frames: FrameOption[],
+  defaultAspect: number,
+): PublicFrameOption[] {
+  return frames.map(({ id, label, description, thumbnail, aspect }) => ({
     id,
     label,
     description,
     thumbnail,
+    aspect: aspect && aspect > 0 ? aspect : defaultAspect,
   }));
 }

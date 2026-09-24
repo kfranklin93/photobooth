@@ -123,6 +123,39 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Per-event palettes
+   ---------------------------------------------------------------------------
+   Each event sets data-palette on <html>, which remaps the colour tokens the
+   components already use. So a new event gets its own look by adding a block
+   here rather than by forking any component.
+
+   Only the tokens that carry the theme are remapped. Structure, spacing and
+   type stay shared.
+   --------------------------------------------------------------------------- */
+
+/* Sleepover: midnight navy and blush rose, against the shower's violet/gold. */
+[data-palette="sleepover"] {
+  --color-plum-950: #0a1027;
+  --color-plum-900: #141b3d;
+  --color-plum-800: #202a55;
+  --color-violet-700: #2c3673;
+  --color-violet-600: #3d4a9e;
+  --color-violet-500: #5561c4;
+  --color-orchid-400: #8a7fd4;
+  --color-orchid-300: #b3a8ea;
+  --color-lavender-200: #dcd9f5;
+  --color-lavender-100: #eef0fb;
+  --color-blush-50: #fdf6f8;
+
+  /* Rose gold rather than yellow gold. */
+  --color-gold-500: #b3717a;
+  --color-gold-400: #c98d94;
+  --color-gold-300: #e0a9ae;
+  --color-gold-200: #f2c8cb;
+  --color-gold-100: #fbe4e6;
+}
+
+/* ---------------------------------------------------------------------------
    Kiosk base styles
    --------------------------------------------------------------------------- */
 html,
@@ -171,6 +204,35 @@ textarea {
 :focus-visible {
   outline: 3px solid var(--color-gold-200);
   outline-offset: 3px;
+}
+
+/**
+ * The themed backdrop, as a class rather than only on <body>.
+ *
+ * Palettes are applied with data-palette on a wrapper element, and a wrapper
+ * can't restyle <body>. Painting the gradient on the wrapper means the whole
+ * surface picks up the event's palette, not just the text and borders.
+ */
+@utility booth-surface {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      var(--color-violet-600) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 10% 110%,
+      var(--color-violet-700) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      160deg,
+      var(--color-plum-900) 0%,
+      var(--color-plum-950) 55%,
+      var(--color-plum-800) 100%
+    );
+  background-attachment: fixed;
+  color: var(--color-lavender-100);
 }
 
 @utility text-gold-shimmer {

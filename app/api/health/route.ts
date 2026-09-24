@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { checkSetupAccess } from "@/lib/canva/oauth-setup";
 import { getTokenStore } from "@/lib/canva/token-store";
 import { findMissingRuntimeEnv } from "@/lib/env";
-import { getFrames } from "@/config/frames";
+import { eventFrames, getAllEvents, getLiveEvents } from "@/config/events";
 import { MAX_PHOTOS } from "@/config/booth";
 
 export const runtime = "nodejs";
@@ -63,7 +63,8 @@ export async function GET(request: Request) {
     storeError = error instanceof Error ? error.message : String(error);
   }
 
-  const frames = getFrames();
+  const allEvents = getAllEvents();
+  const liveEvents = getLiveEvents();
   const missingEnv = findMissingRuntimeEnv();
 
   // A file store on an ephemeral filesystem is the failure mode worth shouting
@@ -87,8 +88,19 @@ export async function GET(request: Request) {
   if (missingEnv.length > 0) {
     warnings.push(`Missing environment variables: ${missingEnv.join(", ")}`);
   }
-  if (frames.length === 0) {
-    warnings.push("No frames configured in config/frames.ts.");
+  if (liveEvents.length === 0) {
+    warnings.push(
+      "No event has a usable frame. Add a designId or brandTemplateId to at " +
+        "least one frame in config/events.ts.",
+    );
+  }
+  const pending = allEvents.filter((e) => eventFrames(e).length === 0);
+  if (pending.length > 0) {
+    warnings.push(
+      `Event(s) with no frames yet, hidden from the chooser: ${pending
+        .map((e) => e.slug)
+        .join(", ")}`,
+    );
   }
   if (storeReadable && !hasRefreshToken && missingEnv.length === 0) {
     warnings.push(
@@ -116,9 +128,16 @@ export async function GET(request: Request) {
         databaseEnvVarsPresent: databaseEnvVars,
       },
       booth: {
-        frameCount: frames.length,
-        frameIds: frames.map((frame) => frame.id),
         maxPhotos: MAX_PHOTOS,
+        events: allEvents.map((event) => ({
+          slug: event.slug,
+          name: event.name,
+          palette: event.palette,
+          frameCount: eventFrames(event).length,
+          frameIds: eventFrames(event).map((frame) => frame.id),
+          /** Hidden from the chooser until it has a usable frame. */
+          live: eventFrames(event).length > 0,
+        })),
       },
       // Presence only — never the values.
       config: {

@@ -1,8 +1,8 @@
 /**
  * GET /api/canva/template
  *
- * Operator-only setup helper. Walks every frame in config/frames.ts, lists its
- * autofillable field names, and flags whether the configured image field
+ * Operator-only setup helper. Walks every event in config/events.ts, lists each
+ * frame's autofillable field names, and flags whether the configured image field
  * actually matches one of them.
  *
  * This exists because a wrong field name fails silently: Canva ignores data for
@@ -18,7 +18,7 @@ import { frameImageField, getTemplateDataset } from "@/lib/canva/pipeline";
 import { CanvaApiError } from "@/lib/canva/errors";
 import { checkSetupAccess } from "@/lib/canva/oauth-setup";
 import { MissingEnvError } from "@/lib/env";
-import { getFrames } from "@/config/frames";
+import { eventFrames, getAllEvents } from "@/config/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,98 +36,133 @@ interface FrameReport {
   error?: string;
 }
 
+interface EventReport {
+  slug: string;
+  name: string;
+  ok: boolean;
+  frameCount: number;
+  /** Set when the event has no frame pointing at Canva yet. */
+  pending?: boolean;
+  frames: FrameReport[];
+}
+
 export async function GET(request: Request) {
   const access = checkSetupAccess(request);
   if (!access.ok) {
     return new NextResponse(access.message, { status: access.status });
   }
 
-  const frames = getFrames();
-  if (frames.length === 0) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "No frames configured. Add entries to config/frames.ts, or set " +
-          "CANVA_TEMPLATE_ID / CANVA_SOURCE_DESIGN_ID for a single-frame setup.",
-      },
-      { status: 503 },
-    );
-  }
+  const events = getAllEvents();
+  const reports: EventReport[] = [];
 
-  const reports: FrameReport[] = [];
+  for (const event of events) {
+    const frames = eventFrames(event);
 
-  for (const frame of frames) {
-    const imageField = frameImageField(frame);
-    try {
-      const { source, id, dataset } = await getTemplateDataset(
-        frame,
-        request.signal,
-      );
-
-      const fields = Object.entries(dataset).map(([name, field]) => ({
-        name,
-        type: field.type,
-      }));
-      const imageFields = fields.filter((field) => field.type === "image");
-      const matches = fields.some((field) => field.name === imageField);
-
+    // An event with no wired frames is expected during setup, not an error.
+    if (frames.length === 0) {
       reports.push({
-        frameId: frame.id,
-        label: frame.label,
-        ok: matches,
-        source,
-        canvaId: id,
-        imageField,
-        imageFieldMatches: matches,
-        fields,
-        hint: matches
-          ? undefined
-          : imageFields.length > 0
-            ? `Image field "${imageField}" not found. Use one of: ` +
-              imageFields.map((f) => f.name).join(", ")
-            : "This design has no image data fields. Select the frame in Canva, " +
-              "open Apps > Data autofill, and give it a name.",
+        slug: event.slug,
+        name: event.name,
+        ok: true,
+        pending: true,
+        frameCount: 0,
+        frames: [],
       });
-    } catch (error) {
-      if (error instanceof MissingEnvError) {
-        return NextResponse.json(
-          { ok: false, error: error.message },
-          { status: 503 },
+      continue;
+    }
+
+    const frameReports: FrameReport[] = [];
+
+    for (const frame of frames) {
+      const imageField = frameImageField(frame);
+      try {
+        const { source, id, dataset } = await getTemplateDataset(
+          frame,
+          request.signal,
         );
-      }
 
-      const isApiError = error instanceof CanvaApiError;
-      reports.push({
-        frameId: frame.id,
-        label: frame.label,
-        ok: false,
-        imageField,
-        error: error instanceof Error ? error.message : String(error),
-        hint:
-          isApiError && error.status === 404
-            ? "Check the ID. A brand template ID comes from " +
-              "/brand/brand-templates/<ID>; a design ID comes from /design/<ID>/edit."
-            : isApiError && error.status === 403
-              ? "Your Canva account cannot access this design, or a brandtemplate " +
-                "scope is missing. Enable it and re-run /api/canva/auth."
-              : undefined,
-      });
-      if (!isApiError) {
-        console.error(`[canva/template] Frame "${frame.id}" failed:`, error);
+        const fields = Object.entries(dataset).map(([name, field]) => ({
+          name,
+          type: field.type,
+        }));
+        const imageFields = fields.filter((field) => field.type === "image");
+        const matches = fields.some((field) => field.name === imageField);
+
+        frameReports.push({
+          frameId: frame.id,
+          label: frame.label,
+          ok: matches,
+          source,
+          canvaId: id,
+          imageField,
+          imageFieldMatches: matches,
+          fields,
+          hint: matches
+            ? undefined
+            : imageFields.length > 0
+              ? `Image field "${imageField}" not found. Use one of: ` +
+                imageFields.map((f) => f.name).join(", ")
+              : "This design has no image data fields. Select the frame in " +
+                "Canva, open Apps > Data autofill, and give it a name.",
+        });
+      } catch (error) {
+        if (error instanceof MissingEnvError) {
+          return NextResponse.json(
+            { ok: false, error: error.message },
+            { status: 503 },
+          );
+        }
+
+        const isApiError = error instanceof CanvaApiError;
+        frameReports.push({
+          frameId: frame.id,
+          label: frame.label,
+          ok: false,
+          imageField,
+          error: error instanceof Error ? error.message : String(error),
+          hint:
+            isApiError && error.status === 404
+              ? "Check the ID. A brand template ID comes from " +
+                "/brand/brand-templates/<ID>; a design ID comes from " +
+                "/design/<ID>/edit. Re-creating a design in Canva mints a new ID."
+              : isApiError && error.status === 403
+                ? "Your Canva account cannot access this design, or a " +
+                  "brandtemplate scope is missing. Enable it and re-run " +
+                  "/api/canva/auth."
+                : undefined,
+        });
+        if (!isApiError) {
+          console.error(
+            `[canva/template] ${event.slug}/${frame.id} failed:`,
+            error,
+          );
+        }
       }
     }
+
+    reports.push({
+      slug: event.slug,
+      name: event.name,
+      ok: frameReports.every((report) => report.ok),
+      frameCount: frameReports.length,
+      frames: frameReports,
+    });
   }
 
   const allOk = reports.every((report) => report.ok);
+  const liveCount = reports.filter((r) => !r.pending).length;
+
   return NextResponse.json(
     {
       ok: allOk,
-      frameCount: reports.length,
+      eventCount: reports.length,
+      liveEventCount: liveCount,
       summary: allOk
-        ? "Every frame is wired up correctly."
+        ? liveCount === reports.length
+          ? "Every frame on every event is wired up correctly."
+          : "Every wired frame is correct. Some events have no frames yet."
         : "Some frames need attention. See the hint on each entry below.",
-      frames: reports,
+      events: reports,
     },
     { status: allOk ? 200 : 207 },
   );
