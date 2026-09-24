@@ -42,6 +42,14 @@ export async function GET(request: Request) {
   const store = getTokenStore();
   const serverless = isServerless();
 
+  // Which database env vars actually exist, by NAME only — never values.
+  // Integrations differ on naming (DATABASE_URL vs POSTGRES_URL vs a prefixed
+  // variant), and the token store can only use names it knows to look for.
+  const databaseEnvVars = Object.keys(process.env)
+    .filter((key) => /DATABASE|POSTGRES|NEON|^PG/.test(key))
+    .filter((key) => (process.env[key] ?? "").trim().length > 0)
+    .sort();
+
   // Does the store actually hold a refresh token? Read-only: writing here would
   // risk clobbering a live token.
   let storeReadable = false;
@@ -68,6 +76,13 @@ export async function GET(request: Request) {
         `refresh tokens will be lost on cold start. Attach a Postgres database ` +
         `(DATABASE_URL) or configure Upstash.`,
     );
+    if (databaseEnvVars.length > 0) {
+      warnings.push(
+        `A database appears to be attached (${databaseEnvVars.join(", ")}) but ` +
+          `the token store did not pick it up. Set CANVA_TOKEN_DATABASE_URL to ` +
+          `the same value, or report these names so the lookup list can include them.`,
+      );
+    }
   }
   if (missingEnv.length > 0) {
     warnings.push(`Missing environment variables: ${missingEnv.join(", ")}`);
@@ -96,6 +111,9 @@ export async function GET(request: Request) {
         readable: storeReadable,
         hasRefreshToken,
         error: storeError,
+        /** Names only. If the store is "memory" but this list is non-empty, the
+         *  connection string exists under a name the store doesn't recognise. */
+        databaseEnvVarsPresent: databaseEnvVars,
       },
       booth: {
         frameCount: frames.length,
