@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
+
+# Canva OAuth token cache — contains a live refresh token, never commit it
+.canva-token.json
 
 # vercel
 .vercel

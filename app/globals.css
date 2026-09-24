@@ -1,26 +1,207 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+   "Princess Butterflies" theme: deep violets, soft lavenders, metallic gold.
+   --------------------------------------------------------------------------- */
+@theme {
+  /* Purples, dark to light */
+  --color-plum-950: #1b0630;
+  --color-plum-900: #2b0f47;
+  --color-plum-800: #3b1a5c;
+  --color-violet-700: #4c1d95;
+  --color-violet-600: #6d28d9;
+  --color-violet-500: #7e22ce;
+  --color-orchid-400: #a855f7;
+  --color-orchid-300: #c084fc;
+  --color-lavender-200: #e9d5ff;
+  --color-lavender-100: #f4eefb;
+  --color-blush-50: #fdf8ff;
+
+  /* Metallic gold accents */
+  --color-gold-500: #b8942f;
+  --color-gold-400: #c8a951;
+  --color-gold-300: #e4c96f;
+  --color-gold-200: #f0d98c;
+  --color-gold-100: #f9ecc2;
+
+  /* Typography (CSS vars are set by next/font in layout.tsx) */
+  --font-display: var(--font-cinzel), ui-serif, Georgia, serif;
+  --font-body: var(--font-quicksand), ui-sans-serif, system-ui, sans-serif;
+
+  /* Extra-small breakpoint for narrow phones (iPhone SE and similar). */
+  --breakpoint-xs: 25rem;
+
+  /* Animations */
+  --animate-flutter: flutter 9s ease-in-out infinite;
+  --animate-drift: drift 14s linear infinite;
+  --animate-twinkle: twinkle 3.2s ease-in-out infinite;
+  --animate-breathe: breathe 4s ease-in-out infinite;
+  --animate-shimmer: shimmer 3.5s linear infinite;
+  --animate-wing: wing 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* A butterfly bobbing gently in place. */
+@keyframes flutter {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -22px, 0) rotate(4deg);
   }
 }
 
+/* A butterfly crossing the screen. */
+@keyframes drift {
+  0% {
+    transform: translate3d(-8vw, 8vh, 0) rotate(-6deg);
+    opacity: 0;
+  }
+  10%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(108vw, -14vh, 0) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* Sweeps a gold highlight across text or a border. */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* Squashes the butterfly horizontally so the wings look like they beat. */
+@keyframes wing {
+  0%,
+  100% {
+    transform: scaleX(1) rotate(0deg);
+  }
+  50% {
+    transform: scaleX(0.72) rotate(2deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Kiosk base styles
+   --------------------------------------------------------------------------- */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      var(--color-violet-600) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 10% 110%,
+      var(--color-violet-700) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      160deg,
+      var(--color-plum-900) 0%,
+      var(--color-plum-950) 55%,
+      var(--color-plum-800) 100%
+    );
+  background-attachment: fixed;
+  color: var(--color-lavender-100);
+  font-family: var(--font-body);
+  /* Kiosk touches: no accidental double-tap zoom, no rubber-band scroll,
+     no text selection on the chrome. Pinch-zoom stays available (WCAG 1.4.4). */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Inputs still need selection and the OS keyboard. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Visible, on-theme focus ring for keyboard and switch-control users. */
+:focus-visible {
+  outline: 3px solid var(--color-gold-200);
+  outline-offset: 3px;
+}
+
+@utility text-gold-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-gold-300) 0%,
+    var(--color-gold-100) 45%,
+    var(--color-gold-300) 55%,
+    var(--color-gold-400) 100%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+/* Respect the OS "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .text-gold-shimmer {
+    color: var(--color-gold-200);
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
 }

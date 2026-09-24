@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200"
+     preserveAspectRatio="none" role="img" aria-label="Frame preview placeholder">
+  <title>Frame preview placeholder</title>
+  <defs>
+    <linearGradient id="ph-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0d98c" />
+      <stop offset="50%" stop-color="#c8a951" />
+      <stop offset="100%" stop-color="#f9ecc2" />
+    </linearGradient>
+  </defs>
+
+  <!-- Centre stays transparent so the camera shows through, matching the
+       real frame artwork. Border only. -->
+  <rect x="14" y="14" width="872" height="1172" rx="44" fill="none"
+        stroke="url(#ph-gold)" stroke-width="26" />
+  <rect x="46" y="46" width="808" height="1108" rx="28" fill="none"
+        stroke="url(#ph-gold)" stroke-width="5" opacity="0.6" />
+
+  <g fill="url(#ph-gold)" opacity="0.9">
+    <circle cx="450" cy="74" r="10" />
+    <circle cx="450" cy="1126" r="10" />
+  </g>
+
+  <text x="450" y="1090" text-anchor="middle" font-family="Georgia, serif"
+        font-size="30" fill="url(#ph-gold)" opacity="0.75">
+    artwork coming soon
+  </text>
+</svg>
