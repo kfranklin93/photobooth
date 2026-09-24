@@ -15,7 +15,7 @@ import { getTokenStore } from "@/lib/canva/token-store";
 import {
   STATE_COOKIE,
   VERIFIER_COOKIE,
-  checkSetupAccess,
+
   escapeHtml,
   redirectUri,
   setupPage,
@@ -44,11 +44,14 @@ function errorPage(title: string, detail: string, status: number) {
 }
 
 export async function GET(request: Request) {
-  const access = checkSetupAccess(request);
-  if (!access.ok) {
-    return new NextResponse(access.message, { status: access.status });
-  }
-
+  // Deliberately NOT gated by CANVA_SETUP_SECRET. Canva builds this redirect
+  // itself from the registered URL, so it cannot carry a `?secret=` — gating it
+  // would reject the very flow it exists to complete.
+  //
+  // Access control comes from the PKCE cookies instead: the state and verifier
+  // are httpOnly, set only by /api/canva/auth, and that route *is* gated. So a
+  // request here without valid cookies is rejected below, and a request with
+  // them provably originated from an authorised start.
   const url = new URL(request.url);
   const canvaError = url.searchParams.get("error");
   if (canvaError) {
@@ -72,7 +75,9 @@ export async function GET(request: Request) {
   if (!expectedState || !codeVerifier) {
     return errorPage(
       "Setup session expired",
-      "The one-time setup cookies are missing or expired.",
+      "The one-time setup cookies are missing or expired. They last 10 minutes " +
+        "and are set when you start at /api/canva/auth. Start the flow there " +
+        "again, in the same browser, and approve within 10 minutes.",
       400,
     );
   }
